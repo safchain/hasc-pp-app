@@ -6,6 +6,7 @@
 	import Trash from '$lib/img/trash.svg';
 	import Globle from '$lib/img/globe.svg';
 	import Matter from '$lib/img/matter.svg';
+	import Mqtt from '$lib/img/mqtt.svg';
 	import { WritableTokenStore } from '$lib/store/auth';
 	import { PUBLIC_API_ENDPOINT } from '$env/static/public';
 	import { goto } from '$app/navigation';
@@ -142,9 +143,12 @@
 							{#if device.Type === 'webhook'}
 								<img src={Globle} class="picto-tiny" alt="Globle" />
 								hook
-							{:else}
+							{:else if device.Type === 'matter'}
 								<img src={Matter} class="picto-tiny" alt="Matter" />
 								matter
+							{:else}
+								<img src={Mqtt} class="picto-tiny" alt="MQTT" />
+								mqtt
 							{/if}
 						</div>
 						<div class="one column column-align">

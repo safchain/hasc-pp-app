@@ -5,14 +5,14 @@
 	const uniqueID = Math.floor(Math.random() * 100);
 
 	function handleClick() {
-		checked = checked ? false : true
+		checked = checked ? false : true;
 	}
 </script>
 
 <div class="s s--slider">
 	<label for="ble" id={`switch-${uniqueID}`}>{label}</label>
 	<button
-    id="ble"
+		id="ble"
 		role="switch"
 		aria-checked={checked}
 		aria-labelledby={`switch-${uniqueID}`}
@@ -33,7 +33,7 @@
 	}
 
 	.s--slider button {
-    padding: 0;
+		padding: 0;
 		width: 3em;
 		height: 1.6em;
 		position: relative;

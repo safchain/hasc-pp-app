@@ -10,7 +10,7 @@
 	import QrScanner from 'qr-scanner';
 	import { onMount } from 'svelte';
 	import { BackToLogin } from '$lib/route/route';
-	import Switch from './Switch.svelte'
+	import Switch from './Switch.svelte';
 
 	let token = '';
 	let netError = false;
@@ -20,7 +20,7 @@
 	let name = '';
 	let scanner: QrScanner;
 	let loading = false;
-  let ble = false;
+	let ble = false;
 
 	WritableTokenStore.subscribe((t) => {
 		token = t;
@@ -61,7 +61,7 @@
 			body: JSON.stringify({
 				QRCode: qrcode,
 				Name: name,
-        BLE: ble
+				BLE: ble
 			})
 		})
 			.then((res) => {
@@ -131,7 +131,7 @@
 			<input class="input" type="text" placeholder="QRCode" id="qrcode" bind:value={qrcode} />
 			<label for="name">Device name :</label>
 			<input class="input" type="text" placeholder="Device name" id="name" bind:value={name} />
-      <Switch bind:checked={ble} label="BLE :" />
+			<Switch bind:checked={ble} label="BLE :" />
 			<div class="btn">
 				<input class="button-primary input" type="submit" value="Add" on:click={addNode} />
 			</div>
