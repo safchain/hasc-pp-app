@@ -6,10 +6,15 @@
 	import Microchip from '$lib/img/microchip.svg';
 	import { State, Connect, Error, type Value } from '$lib/store/state';
 	import { onMount } from 'svelte';
-	import { PUBLIC_ENVOY_NODE_ID } from '$env/static/public';
-	import { PUBLIC_MQTT_NODE_ID } from '$env/static/public';
-	import { PUBLIC_API_ENDPOINT } from '$env/static/public';
-	import { PUBLIC_WEATHER_NODE_ID } from '$env/static/public';
+	import { PUBLIC_ENVOY_ACTIVE_INVERTERS } from '$env/static/public';
+	import { PUBLIC_ENVOY_INSTANT_PRODUCTION } from '$env/static/public';
+	import { PUBLIC_ENVOY_NET_INSTANT_CONSUMPTION } from '$env/static/public';
+	import { PUBLIC_BOILER_CONSUMPTION } from '$env/static/public';
+	import { PUBLIC_BOILER_TEMPERATURE } from '$env/static/public';
+	import { PUBLIC_BOILER_FLOW } from '$env/static/public';
+	import { PUBLIC_TEMPERATURE } from '$env/static/public';
+	import { PUBLIC_HUMIDITY } from '$env/static/public';
+
 	import { WritableTokenStore } from '$lib/store/auth';
 	import { Type } from '$lib/utils/types';
 	import { BackToLogin } from '$lib/route/route';
@@ -63,35 +68,33 @@
 		}
 	});
 
+	let parseFloatPath = (states, path) => {
+		return Math.floor(
+			parseFloat(states?.get(path)?.Value || '0')
+		);
+	}
+
 	State.subscribe((t) => {
 		states = t;
 
-		ActiveInverters = Math.floor(
-			parseFloat(states?.get(`${PUBLIC_ENVOY_NODE_ID}/1/100001/1`)?.Value || '0')
-		);
-		InstantProduction = Math.floor(
-			parseFloat(states?.get(`${PUBLIC_ENVOY_NODE_ID}/1/100002/1`)?.Value || '0')
-		);
+		ActiveInverters = parseFloatPath(states, PUBLIC_ENVOY_ACTIVE_INVERTERS);
+		InstantProduction = parseFloatPath(states, PUBLIC_ENVOY_INSTANT_PRODUCTION);
 		if (InstantProduction < 0) {
 			InstantProduction = 0;
 		}
-		NetInstantConsumption = Math.floor(
-			parseFloat(states?.get(`${PUBLIC_ENVOY_NODE_ID}/1/100003/2`)?.Value || '0')
-		);
+		NetInstantConsumption = parseFloatPath(states, PUBLIC_ENVOY_NET_INSTANT_CONSUMPTION);
 
-		let value = Math.floor(
-			parseFloat(states?.get(`${PUBLIC_MQTT_NODE_ID}/1/110005/3`)?.Value || '0') * 220
-		);
+		let value = parseFloatPath(states, PUBLIC_BOILER_CONSUMPTION);
 		BoilerConsumption = value > 500 ? value : 0;
 
-		BoilerTemperature = parseFloat(states?.get(`${PUBLIC_MQTT_NODE_ID}/1/110005/1`)?.Value || '0');
-		BoilerFlow = parseFloat(states?.get(`${PUBLIC_MQTT_NODE_ID}/1/110005/5`)?.Value || '0') / 8000;
+		BoilerTemperature = parseFloatPath(states, PUBLIC_BOILER_TEMPERATURE);
+		BoilerFlow = parseFloatPath(states, PUBLIC_BOILER_FLOW) / 8000;
 
-		RoomTemperature = parseFloat(states?.get(`${PUBLIC_MQTT_NODE_ID}/1/110002/3`)?.Value || '0');
+		RoomTemperature = '0'; //parseFloat(states?.get(`${PUBLIC_MQTT_NODE_ID}/1/110002/3`)?.value || '0');
 
-		VMCStatus = (states?.get(`${PUBLIC_MQTT_NODE_ID}/1/110001/1`)?.Value || 'false') == 'true';
+		VMCStatus = 'false'; //(states?.get(`${PUBLIC_MQTT_NODE_ID}/1/110001/1`)?.value || 'false') == 'true';
 
-		HeaterConsumption = parseFloat(states?.get(`${PUBLIC_MQTT_NODE_ID}/1/110002/7`)?.Value || '0');
+		HeaterConsumption = '0'; //parseFloat(states?.get(`${PUBLIC_MQTT_NODE_ID}/1/110002/7`)?.value || '0');
 
 		HomeConsumption = NetInstantConsumption + InstantProduction;
 		OtherConsumption = HomeConsumption - HeaterConsumption - CarConsumption - BoilerConsumption;
@@ -127,8 +130,8 @@
 			HomeColor = Red;
 		}
 
-		Temperature = parseFloat(states?.get(`${PUBLIC_WEATHER_NODE_ID}/1/120001/1`)?.Value || '0');
-		Humidity = parseFloat(states?.get(`${PUBLIC_WEATHER_NODE_ID}/1/120001/2`)?.Value || '0');
+		Temperature = parseFloatPath(states, PUBLIC_TEMPERATURE);
+		Humidity = parseFloatPath(states, PUBLIC_HUMIDITY);
 	});
 
 	onMount(async () => {

@@ -1,42 +1,44 @@
 import { writable } from 'svelte/store';
 import { WritableTokenStore } from '$lib/store/auth';
 import { PUBLIC_WS_ENDPOINT } from '$env/static/public';
+import { PUBLIC_API_ENDPOINT } from '$env/static/public';
 
 export class Path {
-	NodeId: number;
+	NodeName: string;
 	EndpointId: number;
-	ClusterId: number;
-	AttributeId: number;
+	ClusterName: string;
+	Name: string;
 
-	constructor(NodeId: number, EndpointId: number, ClusterId: number, AttributeId: number) {
-		this.NodeId = NodeId;
+	constructor(NodeName: string, EndpointId: number, ClusterName: string, Name: string) {
+		this.NodeName = NodeName;
 		this.EndpointId = EndpointId;
-		this.ClusterId = ClusterId;
-		this.AttributeId = AttributeId;
+		this.ClusterName = ClusterName;
+		this.Name = Name;
 	}
 
 	toString(): string {
-		return `${this.NodeId}/${this.EndpointId}/${this.ClusterId}/${this.AttributeId}`;
+		return `${this.NodeName}/${this.EndpointId}/${this.ClusterName}/${this.Name}`;
 	}
 }
 
 export interface Value {
 	Type: string;
 	Value: string;
-	Date: string;
 }
 
 interface Data {
-	NodeId: number;
-	EndpointId: number;
-	ClusterId: number;
 	Id: number;
+	NodeName: string;
+	EndpointId: number;
+	ClusterName: string;
+	ClusterId: number;
+	Name: string;
 	Type: string;
 	Value: string;
 	Date: string;
 }
 
-interface Data extends Path, Value {}
+interface Data extends Path, Value { }
 
 type State = Map<string, Value>;
 
@@ -49,23 +51,37 @@ WritableTokenStore.subscribe((t) => {
 export const State = writable<State>(new Map());
 export const Error = writable<string>('');
 
+const updateState = (data: Data) => {
+	let path = new Path(data.NodeName, data.EndpointId, data.ClusterName, data.Name);
+
+	let value: Value = {
+		Type: data.Type,
+		Value: data.Value,
+	};
+
+	State.update((state) => {
+		state.set(path.toString(), value);
+		return state;
+	});
+};
+
 export const Connect = () => {
+	fetch(`${PUBLIC_API_ENDPOINT}/api/attributes`, {
+		headers: new Headers({
+			'Authorization': `Bearer ${token}`,
+		})
+	}).then((res) => {
+		if (res.ok) {
+			return res.json().then((arr: Data[]) => {
+				arr.forEach(updateState);
+			});
+		}
+	});
+
 	const ws = new WebSocket(`${PUBLIC_WS_ENDPOINT}/ws?token=${token}`);
 
 	ws.addEventListener('message', (message: any) => {
-		const data: Data = JSON.parse(message.data);
-		let path = new Path(data.NodeId, data.EndpointId, data.ClusterId, data.Id);
-
-		let value: Value = {
-			Type: data.Type,
-			Value: data.Value,
-			Date: data.Date
-		};
-
-		State.update((state) => {
-			state.set(path.toString(), value);
-			return state;
-		});
+		updateState(JSON.parse(message.data));
 	});
 
 	ws.addEventListener('open', () => {
