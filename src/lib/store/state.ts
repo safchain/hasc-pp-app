@@ -29,6 +29,7 @@ export interface Value {
 interface Data {
 	Id: number;
 	NodeName: string;
+	NodeId: number;
 	EndpointId: number;
 	ClusterName: string;
 	ClusterId: number;
@@ -51,6 +52,8 @@ WritableTokenStore.subscribe((t) => {
 export const State = writable<State>(new Map());
 export const Error = writable<string>('');
 
+export let NodeIds = new Map<string, number>;
+
 const updateState = (data: Data) => {
 	let path = new Path(data.NodeName, data.EndpointId, data.ClusterName, data.Name);
 
@@ -63,7 +66,11 @@ const updateState = (data: Data) => {
 		state.set(path.toString(), value);
 		return state;
 	});
+
+	NodeIds.set(data.NodeName, data.NodeId);
 };
+
+let lastUpdate = new Date();
 
 export const Connect = () => {
 	fetch(`${PUBLIC_API_ENDPOINT}/api/attributes`, {
@@ -78,9 +85,11 @@ export const Connect = () => {
 		}
 	});
 
-	const ws = new WebSocket(`${PUBLIC_WS_ENDPOINT}/ws?token=${token}`);
+	let ws = new WebSocket(`${PUBLIC_WS_ENDPOINT}/ws?token=${token}`);
 
 	ws.addEventListener('message', (message: any) => {
+		lastUpdate = new Date();
+
 		updateState(JSON.parse(message.data));
 	});
 
@@ -97,4 +106,20 @@ export const Connect = () => {
 			return error;
 		});
 	});
+
+	ws.onclose = function () {
+		setTimeout(() => {
+			ws = new WebSocket(`${PUBLIC_WS_ENDPOINT}/ws?token=${token}`);
+		}, 1000)
+	}
+
+	document.addEventListener("visibilitychange", function (e) {
+		ws = new WebSocket(`${PUBLIC_WS_ENDPOINT}/ws?token=${token}`);
+	});
+
+	setInterval(() => {
+		if (new Date().getTime() - lastUpdate.getTime() > 5000) {
+			ws = new WebSocket(`${PUBLIC_WS_ENDPOINT}/ws?token=${token}`);
+		}
+	}, 1000);
 };

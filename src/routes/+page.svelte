@@ -4,7 +4,7 @@
 	import Gear from '$lib/img/gear.svg';
 	import ArrowLeftRigth from '$lib/img/arrow-left-right.svg';
 	import Microchip from '$lib/img/microchip.svg';
-	import { State, Connect, Error, type Value } from '$lib/store/state';
+	import { State, Connect, Error, NodeIds, type Value } from '$lib/store/state';
 	import { onMount } from 'svelte';
 	import { PUBLIC_ENVOY_ACTIVE_INVERTERS } from '$env/static/public';
 	import { PUBLIC_ENVOY_INSTANT_PRODUCTION } from '$env/static/public';
@@ -14,7 +14,8 @@
 	import { PUBLIC_BOILER_FLOW } from '$env/static/public';
 	import { PUBLIC_TEMPERATURE } from '$env/static/public';
 	import { PUBLIC_HUMIDITY } from '$env/static/public';
-
+	import { PUBLIC_VMC_STATE } from '$env/static/public';
+	import { PUBLIC_API_ENDPOINT } from '$env/static/public';
 	import { WritableTokenStore } from '$lib/store/auth';
 	import { Type } from '$lib/utils/types';
 	import { BackToLogin } from '$lib/route/route';
@@ -52,7 +53,7 @@
 	let NetInstantConsumptionStyle = '';
 	let OtherConsumptionStyle = '';
 	let BoilerFlowStyle = '';
-	let VMCStatus = false;
+	let VMCState = false;
 
 	let Red = 'rgb(232, 19, 19)';
 	let Green = 'rgb(0, 138, 14)';
@@ -68,11 +69,13 @@
 		}
 	});
 
-	let parseFloatPath = (states, path) => {
-		return Math.floor(
-			parseFloat(states?.get(path)?.Value || '0')
-		);
-	}
+	let parseFloatPath = (states: Map<string, Value>, path: string):number => {
+		return Math.floor(parseFloat(states?.get(path)?.Value || '0'));
+	};
+
+	let parseBooleanPath = (states: Map<string, Value>, path: string):boolean => {
+		return (states?.get(path)?.Value || 'false') == 'true';
+	};
 
 	State.subscribe((t) => {
 		states = t;
@@ -84,17 +87,17 @@
 		}
 		NetInstantConsumption = parseFloatPath(states, PUBLIC_ENVOY_NET_INSTANT_CONSUMPTION);
 
-		let value = parseFloatPath(states, PUBLIC_BOILER_CONSUMPTION);
+		let value = parseFloatPath(states, PUBLIC_BOILER_CONSUMPTION) * 230;
 		BoilerConsumption = value > 500 ? value : 0;
 
 		BoilerTemperature = parseFloatPath(states, PUBLIC_BOILER_TEMPERATURE);
 		BoilerFlow = parseFloatPath(states, PUBLIC_BOILER_FLOW) / 8000;
 
-		RoomTemperature = '0'; //parseFloat(states?.get(`${PUBLIC_MQTT_NODE_ID}/1/110002/3`)?.value || '0');
+		RoomTemperature = 0; //parseFloat(states?.get(`${PUBLIC_MQTT_NODE_ID}/1/110002/3`)?.value || '0');
 
-		VMCStatus = 'false'; //(states?.get(`${PUBLIC_MQTT_NODE_ID}/1/110001/1`)?.value || 'false') == 'true';
+		VMCState = parseBooleanPath(states, PUBLIC_VMC_STATE);
 
-		HeaterConsumption = '0'; //parseFloat(states?.get(`${PUBLIC_MQTT_NODE_ID}/1/110002/7`)?.value || '0');
+		HeaterConsumption = 0; //parseFloat(states?.get(`${PUBLIC_MQTT_NODE_ID}/1/110002/7`)?.value || '0');
 
 		HomeConsumption = NetInstantConsumption + InstantProduction;
 		OtherConsumption = HomeConsumption - HeaterConsumption - CarConsumption - BoilerConsumption;
@@ -177,14 +180,27 @@
 			});
 	};
 
+	const triggerHapticFeedback = () => {
+		if (window.AndroidHaptic) {
+			window.AndroidHaptic.vibrate(100); // Vibrates for 100ms
+		}
+	}
+
 	const sendVMC = () => {
+		let nodeId = NodeIds.get('VMC');
+		if (nodeId == undefined) {
+			return;
+		}
+
+		triggerHapticFeedback();
+
 		sendCommand(
-			parseInt(PUBLIC_MQTT_NODE_ID),
+			nodeId,
 			1,
-			110001,
-			1,
-			Type.Boolean,
-			VMCStatus ? 'false' : 'true'
+			6,
+			VMCState ? 2 : 1,
+			Type.Null,
+			'null'
 		);
 	};
 </script>
@@ -779,7 +795,7 @@
 				d="M386.804 40.098c3.88 0 7 3.14 7 7v20.9h1.7c5.34 0 9.6 4.3 9.6 9.6v3.45c0 1.45 1.2 2.63 2.64 2.63 1.45 0 2.58-1.18 2.58-2.63v-13.45c-3.52-1.1-6.1-4.4-6.1-8.3v-3.5c0-.96.83-1.74 1.77-1.74h1.74v-5.26c0-.93.76-1.7 1.76-1.7.94 0 1.7.77 1.7 1.7v5.26h3.5v-5.26c0-.93.76-1.7 1.77-1.7.94 0 1.7.77 1.7 1.7v5.26h1.75c1 0 1.75.78 1.75 1.73v3.5c0 3.9-2.57 7.2-6.08 8.3v13.45c0 4.35-3.53 7.87-7.86 7.87s-7.84-3.52-7.84-7.87v-3.45c0-2.4-1.94-4.36-4.4-4.36h-1.7v15.68c1.9 0 3.47 1.56 3.47 3.5 0 1.9-1.57 3.47-3.46 3.47h-31.36c-1.95 0-3.5-1.57-3.5-3.47 0-1.95 1.55-3.5 3.5-3.5v-41.84c0-3.86 3.07-7 6.96-7h17.4zm-6.35 9.16-12.18 10.43c-.56.5-.75 1.27-.5 1.94.25.67.88 1.12 1.5 1.12h6.4l-2.7 8.2c-.24.72 0 1.56.7 1.95.63.46 1.38.4 2.07-.1l12.18-10.43c.56-.5.75-1.28.5-1.95-.25-.67-.88-1.12-1.63-1.12h-6.3l2.7-8.2c.26-.72 0-1.56-.62-1.95-.75-.45-1.57-.4-2.13.1z"
 			></path>
 			<path
-				style="fill:rgb(0, 194, 168);stroke:rgb(0, 0, 0);stroke-width:0.29px;stroke-opacity:0;fill-opacity:0.298165;opacity:{VMCStatus
+				style="fill:rgb(0, 194, 168);stroke:rgb(0, 0, 0);stroke-width:0.29px;stroke-opacity:0;fill-opacity:0.298165;opacity:{VMCState
 					? '1'
 					: '0'};"
 				d="M249.464 65.505c-2.497-2.566-5.2-4.568-8.025-5.893l12.289-9.784c1.065-.856.994-2.42-.005-3.26-8.062-6.318-19.748-6.01-27.23 1.272-2.508 2.441-4.49 5.18-5.864 7.969l-9.672-12.188c-.812-1.122-2.419-.995-3.267-.002-6.421 7.883-5.936 19.593 1.269 26.996 2.497 2.565 5.192 4.574 8.031 5.9l-12.302 9.783c-1.059.863-.98 2.434.012 3.282 8.004 6.36 19.571 6 27.045-1.275 2.558-2.49 4.49-5.18 5.864-7.969l9.77 12.289c.848 1.072 2.42.994 3.26-.006 6.374-8.018 6.03-19.684-1.175-27.086zm-23.239 5.286c-1.534-1.576-1.407-4.17.17-5.704 1.59-1.549 4.22-1.457 5.663.027 1.493 1.533 1.465 4.114-.126 5.663-1.576 1.534-4.082 1.684-5.714.007z"

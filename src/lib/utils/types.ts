@@ -3,5 +3,6 @@ export enum Type {
 	SignedInteger = 'int',
 	Boolean = 'bool',
 	FloatingPointNumber = 'float',
-	ByteString = 'string'
+	ByteString = 'string',
+	Null = 'null',
 }
