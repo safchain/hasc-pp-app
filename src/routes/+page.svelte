@@ -7,14 +7,15 @@
 	import { State, Connect, Error, NodeIds, type Value } from '$lib/store/state';
 	import { onMount } from 'svelte';
 	import { PUBLIC_ENVOY_ACTIVE_INVERTERS } from '$env/static/public';
-	import { PUBLIC_ENVOY_INSTANT_PRODUCTION } from '$env/static/public';
 	import { PUBLIC_ENVOY_NET_INSTANT_CONSUMPTION } from '$env/static/public';
+	import { PUBLIC_ENVOY_TOTAL_INSTANT_CONSUMPTION } from '$env/static/public';
 	import { PUBLIC_BOILER_CONSUMPTION } from '$env/static/public';
 	import { PUBLIC_BOILER_TEMPERATURE } from '$env/static/public';
 	import { PUBLIC_BOILER_FLOW } from '$env/static/public';
 	import { PUBLIC_TEMPERATURE } from '$env/static/public';
 	import { PUBLIC_HUMIDITY } from '$env/static/public';
 	import { PUBLIC_VMC_STATE } from '$env/static/public';
+	import { PUBLIC_GARAGE_STATE } from '$env/static/public';
 	import { PUBLIC_API_ENDPOINT } from '$env/static/public';
 	import { WritableTokenStore } from '$lib/store/auth';
 	import { Type } from '$lib/utils/types';
@@ -35,6 +36,7 @@
 	let ActiveInverters = 0;
 	let InstantProduction = 0;
 	let NetInstantConsumption = 0;
+	let TotalInstantConsumption = 0;
 	let HomeConsumption = 0;
 	let BoilerConsumption = 0;
 	let HeaterConsumption = 0;
@@ -45,6 +47,7 @@
 	let RoomTemperature = 0;
 	let Temperature = 0;
 	let Humidity = 0;
+	let GarageState = 0;
 
 	let InstantProductionStyle = '';
 	let BoilerConsumptionStyle = '';
@@ -69,11 +72,11 @@
 		}
 	});
 
-	let parseFloatPath = (states: Map<string, Value>, path: string):number => {
+	let parseFloatPath = (states: Map<string, Value>, path: string): number => {
 		return Math.floor(parseFloat(states?.get(path)?.Value || '0'));
 	};
 
-	let parseBooleanPath = (states: Map<string, Value>, path: string):boolean => {
+	let parseBooleanPath = (states: Map<string, Value>, path: string): boolean => {
 		return (states?.get(path)?.Value || 'false') == 'true';
 	};
 
@@ -81,11 +84,13 @@
 		states = t;
 
 		ActiveInverters = parseFloatPath(states, PUBLIC_ENVOY_ACTIVE_INVERTERS);
-		InstantProduction = parseFloatPath(states, PUBLIC_ENVOY_INSTANT_PRODUCTION);
-		if (InstantProduction < 0) {
-			InstantProduction = 0;
-		}
 		NetInstantConsumption = parseFloatPath(states, PUBLIC_ENVOY_NET_INSTANT_CONSUMPTION);
+		TotalInstantConsumption = parseFloatPath(states, PUBLIC_ENVOY_TOTAL_INSTANT_CONSUMPTION);
+
+		InstantProduction = 0;
+		if (NetInstantConsumption < TotalInstantConsumption) {
+			InstantProduction = TotalInstantConsumption - NetInstantConsumption;
+		}
 
 		let value = parseFloatPath(states, PUBLIC_BOILER_CONSUMPTION) * 230;
 		BoilerConsumption = value > 500 ? value : 0;
@@ -99,7 +104,7 @@
 
 		HeaterConsumption = 0; //parseFloat(states?.get(`${PUBLIC_MQTT_NODE_ID}/1/110002/7`)?.value || '0');
 
-		HomeConsumption = NetInstantConsumption + InstantProduction;
+		HomeConsumption = TotalInstantConsumption;
 		OtherConsumption = HomeConsumption - HeaterConsumption - CarConsumption - BoilerConsumption;
 		OtherConsumption = OtherConsumption > 0 ? OtherConsumption : 0;
 
@@ -135,6 +140,7 @@
 
 		Temperature = parseFloatPath(states, PUBLIC_TEMPERATURE);
 		Humidity = parseFloatPath(states, PUBLIC_HUMIDITY);
+		GarageState = Math.floor(parseFloatPath(states, PUBLIC_GARAGE_STATE) / 10);
 	});
 
 	onMount(async () => {
@@ -184,7 +190,7 @@
 		if (window.AndroidHaptic) {
 			window.AndroidHaptic.vibrate(100); // Vibrates for 100ms
 		}
-	}
+	};
 
 	const sendVMC = () => {
 		let nodeId = NodeIds.get('VMC');
@@ -194,14 +200,18 @@
 
 		triggerHapticFeedback();
 
-		sendCommand(
-			nodeId,
-			1,
-			6,
-			VMCState ? 2 : 1,
-			Type.Null,
-			'null'
-		);
+		sendCommand(nodeId, 1, 6, VMCState ? 2 : 1, Type.Null, 'null');
+	};
+
+	const sendGarage = () => {
+		let nodeId = NodeIds.get('Garage');
+		if (nodeId == undefined) {
+			return;
+		}
+
+		triggerHapticFeedback();
+
+		sendCommand(nodeId, 1, 258, GarageState > 0 ? 1 : 0, Type.Null, 'null');
 	};
 </script>
 
@@ -502,7 +512,7 @@
 				y="168.60825"
 			>
 				<tspan id="grid" x="77.935829" y="168.60825" style="text-align:center;text-anchor:middle"
-					>{NetInstantConsumption}</tspan
+					>{Math.abs(NetInstantConsumption)}</tspan
 				>
 				<tspan x="75.935829" y="184.60825" style="text-align:center;text-anchor:middle">Watt</tspan>
 			</text>
@@ -808,11 +818,33 @@
 			<path
 				style="fill:rgb(109, 177, 255);stroke:rgb(0, 0, 0);stroke-width:0.29px;stroke-opacity:0;pointer-events:all;"
 				d="M35.474 84.798v-32.23c0-2.64 1.62-5.02 4.1-6l27.2-10.94c.77-.25 1.68-.25 2.46 0l27.2 10.93c2.47 1 4.1 3.37 4.1 6v32.24c0 1.34-1.1 2.42-2.48 2.42h-4.8c-1.38 0-2.48-1.08-2.48-2.43v-26.94c0-1.7-1.43-3.27-3.26-3.27h-39.01c-1.82 0-3.26 1.55-3.26 3.26v26.96c0 1.34-1.1 2.42-2.47 2.42h-4.88c-1.3 0-2.4-1.08-2.4-2.43zm15.48 2.42c-1.37 0-2.47-1.08-2.47-2.43v-5.7h39.03v5.7c0 1.34-1.1 2.42-2.4 2.42h-34.15zm-2.47-17.87h39.03v6.48h-39.01v-6.48zm0-11.4h39.03v8.14h-39.01v-8.14z"
+				on:click={() => sendGarage()}
 			></path>
 			<path
-				style="fill:rgb(255, 255, 255);stroke:rgb(0, 0, 0);stroke-width:2px;stroke-opacity:0;opacity:0;pointer-events:all;"
+				style="fill:rgb(255, 255, 255);stroke:rgb(0, 0, 0);stroke-width:2px;stroke-opacity:0;opacity:{GarageState >
+				0
+					? 1
+					: 0};pointer-events:all;"
 				d="M46.834 72.798a5 5 0 0 1 5-5h32.33a5 5 0 0 1 5 5v21.75a5 5 0 0 1-5 5h-32.33a5 5 0 0 1-5-5z"
+				on:click={() => sendGarage()}
 			></path>
+			<path
+				style="fill:#ffffff;fill-opacity:1;stroke:#6c8ebf;stroke-width:2.1611px;stroke-miterlimit:4;stroke-dasharray:none"
+				d="m 109.05109,33.333287 c 0,5.00826 -4.05953,9.07157 -9.071574,9.07157 -5.00826,0 -9.07156,-4.06331 -9.07156,-9.07157 0,-5.00825 4.0633,-9.07156 9.07156,-9.07156 5.012044,0 9.071574,4.06331 9.071574,9.07156 z"
+				class="s-y_bCXRrkrYfP"
+				id="path34"
+			/>
+			<text
+				style="font-style:normal;font-weight:normal;font-size:12px;line-height:1;font-family:sans-serif;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none"
+				x="96.463371"
+				y="38.0187"
+				id="text420"
+				><tspan
+					x="99.463371"
+					y="38.0187"
+					style="font-size:13px;text-align:center;text-anchor:middle">{GarageState}</tspan
+				></text
+			>
 		</svg>
 	</div>
 </main>

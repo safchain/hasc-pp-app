@@ -116,10 +116,4 @@ export const Connect = () => {
 	document.addEventListener("visibilitychange", function (e) {
 		ws = new WebSocket(`${PUBLIC_WS_ENDPOINT}/ws?token=${token}`);
 	});
-
-	setInterval(() => {
-		if (new Date().getTime() - lastUpdate.getTime() > 5000) {
-			ws = new WebSocket(`${PUBLIC_WS_ENDPOINT}/ws?token=${token}`);
-		}
-	}, 1000);
 };
